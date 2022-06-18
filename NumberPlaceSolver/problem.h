@@ -36,6 +36,10 @@ public:
 
 	// 候補数によるフィルター
 	bitboard cand_one_bb() const;
+	// 各マスの候補数を計算
+	void get_cand_count_bb(bitboard bb[NUMBER_CNT + 1]) const;
+	// 候補数が 1以上で最小のマスを返す
+	bitboard cand_min_bb() const;
 
 	void set(const Square sq, const Number n);
 	void erase(const Square sq);

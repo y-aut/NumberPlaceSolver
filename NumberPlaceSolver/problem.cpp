@@ -81,6 +81,32 @@ bitboard problem::cand_one_bb() const
 	return one;
 }
 
+void problem::get_cand_count_bb(bitboard bb[NUMBER_CNT + 1]) const
+{
+	bb[0] = all_bb();
+	for (int i = 1; i <= NUMBER_CNT; ++i)
+		bb[i] = zero_bb();
+
+	for (auto n : Number()) {
+		for (int i = NUMBER_CNT; i > 0; --i) {
+			bb[i] |= bb[i - 1] & cand_bb(n);
+			bb[i - 1] &= ~cand_bb(n);
+		}
+	}
+}
+
+bitboard problem::cand_min_bb() const
+{
+	bitboard bb[NUMBER_CNT + 1];
+	get_cand_count_bb(bb);
+
+	for (int i = 1; i <= NUMBER_CNT; ++i) {
+		if (bb[i].isnot_empty()) return bb[i];
+	}
+	ASSERT(false);
+	return zero_bb();
+}
+
 void problem::set(const Square sq, const Number n)
 {
 	ASSERT(at(sq) == NUM_NONE);

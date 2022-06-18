@@ -18,7 +18,7 @@ namespace Search
 	void clear_ans();
 	
 	void solve_all(const problem& p, const bool output, const bool random = false, const int max = -1);
-	void solve_all_body(const problem& p, const bool random, const int max);
+	void solve_all_body(problem& p, const bool random, const int max);
 	void solve(const problem& p, const bool output);
 
 	void add_sol(problem& p, solution* sol);

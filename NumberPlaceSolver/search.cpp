@@ -1,5 +1,6 @@
 #include <iostream>
 #include <random>
+#include <chrono>
 
 #include "search.h"
 
@@ -8,7 +9,8 @@ bool Search::flg_maxans;
 bool Search::flg_output;
 vector<solution*> sols;
 vector<problem*> ans;
-std::mt19937 mt;
+std::random_device rnd;
+std::mt19937 mt(rnd());
 
 void Search::clear_sols()
 {
@@ -40,7 +42,7 @@ void Search::solve_all(const problem& p, const bool output, const bool random, c
 	}
 }
 
-void Search::solve_all_body(const problem& p, const bool random, const int max)
+void Search::solve_all_body(problem& p, const bool random, const int max)
 {
 	if (flg_exit || flg_maxans) return;
 
@@ -58,16 +60,16 @@ void Search::solve_all_body(const problem& p, const bool random, const int max)
 		return;
 	}
 	else {
-		auto sq = p.empty_bb().peek_msb();
+		// 候補数が少ないマスを優先して取り出す
+		auto sq = p.cand_min_bb().peek_msb();
 		auto cand = p.get_cand(sq);
 		if (random) {
 			std::shuffle(cand.begin(), cand.end(), mt);
 		}
 		for (auto n : p.get_cand(sq)) {
-			auto newp = p;
-			newp.set(sq, n);
-			solve_all_body(newp, random, max);
-			ASSERT(ans.size() == 0 || is_ok(*ans[0]));
+			auto cpy = p;
+			cpy.set(sq, n);
+			solve_all_body(cpy, random, max);
 			if (flg_exit || flg_maxans) return;
 		}
 	}
@@ -277,18 +279,25 @@ bool Search::search_sol_xwing_body(problem& p, const int depth, const int depth_
 void Search::make_problem(const problem& pro)
 {
 	// 一度に求める解の個数の上限
-	CSI ANSWER_MAX = 1000;
+	CSI ANSWER_MAX = 10;
 
 	flg_exit = false;
 	auto p = pro;
 	bool flg_search = true;
 
+	// 処理時間を計測
+	chrono::system_clock::time_point start, end;
+	double solve_time = 0, ans0_time = 0, ans1_time = 0, ans2_time = 0;
+
 	for (;;)
 	{
 		// 前の解が再利用できないなら解く
 		if (flg_search) {
+			start = chrono::system_clock::now();
 			// p の解を求める
 			solve_all(p, false, true, ANSWER_MAX);
+			end = chrono::system_clock::now();
+			solve_time += (double)(chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0);
 			if (flg_exit) {
 				cout << "stopped" << endl;
 				return;
@@ -296,12 +305,16 @@ void Search::make_problem(const problem& pro)
 		}
 
 		if (ans.size() == 0) {
+			start = chrono::system_clock::now();
 			// どこかの数字を消す
 			auto sq = (~p.empty_bb()).peek_random(mt);
 			p.erase(sq);
 			flg_search = true;
+			end = chrono::system_clock::now();
+			ans0_time += (double)(chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0);
 		}
 		else if (ans.size() == 1) {
+			start = chrono::system_clock::now();
 			// どこかの数字を消しても解が 1つのままなら消す
 			auto flg_finished = true;
 			auto bb = ~p.empty_bb();
@@ -317,11 +330,13 @@ void Search::make_problem(const problem& pro)
 				}
 				p.set(sq, n);
 			} while (bb.isnot_empty());
+			end = chrono::system_clock::now();
+			ans1_time += (double)(chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0);
 			if (flg_finished) break;
 		}
 		else {
+			start = chrono::system_clock::now();
 			// ans のうち，増やすと最も解答数が少なくなる数字を増やす
-			ASSERT(is_ok(*ans[0]));
 
 			// sq に n が入る解答の数
 			int count[SQ_NB][NUM_NB];
@@ -373,9 +388,13 @@ void Search::make_problem(const problem& pro)
 			}
 
 		LOOPEND:;
+			end = chrono::system_clock::now();
+			ans2_time += (double)(chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0);
 		}
 	}
 
 	// 完成
 	cout << "made " << p.tostring() << endl;
+	cout << "info time solve " << (int)solve_time <<
+		" ans0 " << (int)ans0_time << " ans1 " << (int)ans1_time << " ans2 " << (int)ans2_time << endl;
 }
