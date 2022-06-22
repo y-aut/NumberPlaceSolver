@@ -23,6 +23,7 @@
     <ClCompile Include="board.cpp" />
     <ClCompile Include="bitboard.cpp" />
     <ClCompile Include="game.cpp" />
+    <ClCompile Include="predicate.cpp" />
     <ClCompile Include="problem.cpp" />
     <ClCompile Include="search.cpp" />
     <ClCompile Include="solution.cpp" />
@@ -37,6 +38,7 @@
     <ClInclude Include="bitop.h" />
     <ClInclude Include="game.h" />
     <ClInclude Include="macro.h" />
+    <ClInclude Include="predicate.h" />
     <ClInclude Include="problem.h" />
     <ClInclude Include="search.h" />
     <ClInclude Include="solution.h" />

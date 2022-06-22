@@ -1,14 +1,15 @@
 #include <iostream>
 #include <random>
-#include <chrono>
 
 #include "search.h"
+
+using namespace Search;
 
 atomic<bool> Search::flg_exit;
 bool Search::flg_maxans;
 bool Search::flg_output;
-vector<solution*> sols;
-vector<problem*> ans;
+vector<const solution*> sols;
+vector<const problem*> ans;
 std::random_device rnd;
 std::mt19937 mt(rnd());
 
@@ -24,25 +25,7 @@ void Search::clear_ans()
 	ans.clear();
 }
 
-void Search::solve_all(const problem& p, const bool output, const bool random, const int max)
-{
-	flg_exit = false;
-	flg_maxans = false;
-	flg_output = output;
-	clear_ans();
-	auto cpy = p;
-	solve_all_body(cpy, random, max);
-	if (flg_output) {
-		if (flg_exit)
-			cout << "stopped" << endl;
-		else if (flg_maxans)
-			cout << "max" << endl;
-		else
-			cout << "thatsall" << endl;
-	}
-}
-
-void Search::solve_all_body(problem& p, const bool random, const int max)
+void solve_all_body(problem& p, const bool random, const int max)
 {
 	if (flg_exit || flg_maxans) return;
 
@@ -75,6 +58,24 @@ void Search::solve_all_body(problem& p, const bool random, const int max)
 	}
 }
 
+void Search::solve_all(const problem& p, const bool output, const bool random, const int max)
+{
+	flg_exit = false;
+	flg_maxans = false;
+	flg_output = output;
+	clear_ans();
+	auto cpy = p;
+	solve_all_body(cpy, random, max);
+	if (flg_output) {
+		if (flg_exit)
+			cout << "stopped" << endl;
+		else if (flg_maxans)
+			cout << "max" << endl;
+		else
+			cout << "thatsall" << endl;
+	}
+}
+
 void Search::solve(const problem& pro, const bool output)
 {
 	flg_exit = false;
@@ -94,6 +95,7 @@ void Search::solve(const problem& pro, const bool output)
 		if (search_sol_occupy(p)) continue;
 		if (search_sol_reserve(p)) continue;
 		if (search_sol_xwing(p)) continue;
+		if (search_sol_xychain(p)) continue;
 
 		// no solution
 		if (flg_output) {
@@ -143,43 +145,24 @@ bool Search::search_sol_alone_num_in_group(problem& p)
 	return false;
 }
 
-bool Search::search_sol_occupy(problem& p)
-{
-	Number num[NUMBER_CNT];
-
-	for (auto g : Group()) {
-		int depth_max = (p.empty_bb() & group_bb(g)).popcnt() - 2;
-		if (search_sol_occupy_body(p, 0, depth_max, g, num, zero_bb()))
-			return true;
-	}
-	
-	return false;
-}
-
-bool Search::search_sol_occupy_body(problem& p, const int depth, const int depth_max, const Group g, Number* num, const bitboard bb)
+bool search_sol_occupy_body(problem& p, const int depth, const int depth_max, const Group g, Number* num, const bitboard bb)
 {
 	auto cnt = bb.popcnt();
 	if (cnt == depth && cnt > 0) {
-		// 消す候補があるか
-		auto flgValid = false;
 		auto tmp = bb;
 		do {
 			if (p.get_cand(tmp.pop()).size() > cnt) {
-				flgValid = true;
-				break;
+				// 消す候補が存在する
+				bitarray32 nums = zero_32();
+				for (int i = 0; i < depth; ++i)
+					nums |= each_32(num[i]);
+				for (auto n : Number())
+					if ((p.num_bb(n) & group_bb(g)).isnot_empty()) nums |= each_32(n);
+
+				add_sol(p, new sol_occupy(p.empty_bb() & (group_bb(g) ^ bb), nums.negate(NUMBER_CNT), g));
+				return true;
 			}
 		} while (tmp.isnot_empty());
-
-		if (flgValid) {
-			bitarray32 nums = zero_32();
-			for (int i = 0; i < depth; ++i)
-				nums |= each_32(num[i]);
-			for (auto n : Number())
-				if ((p.num_bb(n) & group_bb(g)).isnot_empty()) nums |= each_32(n);
-
-			add_sol(p, new sol_occupy(p.empty_bb() & (group_bb(g) ^ bb), nums.negate(NUMBER_CNT), g));
-			return true;
-		}
 	}
 	if (cnt > depth_max) return false;
 	if (depth == depth_max) return false;
@@ -190,6 +173,19 @@ bool Search::search_sol_occupy_body(problem& p, const int depth, const int depth
 			if (search_sol_occupy_body(p, depth + 1, depth_max, g, num, tmp))
 				return true;
 		}
+	}
+
+	return false;
+}
+
+bool Search::search_sol_occupy(problem& p)
+{
+	Number num[NUMBER_CNT];
+
+	for (auto g : Group()) {
+		int depth_max = (p.empty_bb() & group_bb(g)).popcnt() - 2;
+		if (search_sol_occupy_body(p, 0, depth_max, g, num, zero_bb()))
+			return true;
 	}
 
 	return false;
@@ -218,46 +214,25 @@ bool Search::search_sol_reserve(problem& p)
 	return false;
 }
 
-bool Search::search_sol_xwing(problem& p)
-{
-	Group g1[CELLS_IN_GROUP];
-
-	for (auto n : Number()) {
-		int depth_max = CELLS_IN_GROUP - p.num_bb(n).popcnt();
-		if (search_sol_xwing_body<GRT_FILE>(p, 0, depth_max, n, g1, zero_32()))
-			return true;
-		if (search_sol_xwing_body<GRT_RANK>(p, 0, depth_max, n, g1, zero_32()))
-			return true;
-	}
-
-	return false;
-}
-
 template <GroupType ForR>
-bool Search::search_sol_xwing_body(problem& p, const int depth, const int depth_max, const Number num, Group* g1, const bitarray32 g2)
+bool search_sol_xwing_body(problem& p, const int depth, const int depth_max, const Number num, Group* g1, const bitarray32 g2)
 {
 	auto cnt = g2.popcnt();
 	if (cnt == depth && cnt > 0) {
-		// 消す候補があるか
-		auto flgValid = false;
 		auto cand = p.cand_bb(num);
 		for (int i = 0; i < depth; ++i) cand &= ~group_bb(g1[i]);
 		auto tmp = g2;
 		do {
 			if ((cand & group_bb((Group)tmp.pop())).isnot_empty()) {
-				flgValid = true;
-				break;
+				// 消す候補が存在する
+				bitarray32 g1list = zero_32();
+				for (int i = 0; i < depth; ++i)
+					g1list |= each_32(g1[i]);
+
+				add_sol(p, new sol_xwing(num, g1list, g2));
+				return true;
 			}
 		} while (tmp.isnot_empty());
-
-		if (flgValid) {
-			bitarray32 g1list = zero_32();
-			for (int i = 0; i < depth; ++i)
-				g1list |= each_32(g1[i]);
-
-			add_sol(p, new sol_xwing(num, g1list, g2));
-			return true;
-		}
 	}
 	if (cnt > depth_max) return false;
 	if (depth == depth_max) return false;
@@ -275,6 +250,138 @@ bool Search::search_sol_xwing_body(problem& p, const int depth, const int depth_
 	return false;
 }
 
+bool Search::search_sol_xwing(problem& p)
+{
+	Group g1[CELLS_IN_GROUP];
+
+	for (auto n : Number()) {
+		int depth_max = CELLS_IN_GROUP - p.num_bb(n).popcnt();
+		if (search_sol_xwing_body<GRT_FILE>(p, 0, depth_max, n, g1, zero_32()))
+			return true;
+		if (search_sol_xwing_body<GRT_RANK>(p, 0, depth_max, n, g1, zero_32()))
+			return true;
+	}
+
+	return false;
+}
+
+bool search_sol_xychain_body(problem& p, Square chain[], Number chain_num[], const int chain_size,
+	const bitboard chain_bb, const Number n1, const Number n2, const bitboard two)
+{
+	// (n2, n3) (n3 != n1) の2数を候補とするマスからなる chain を探す
+	// chain_num[0] には chain[0] の候補のうち，chain[1] の候補でないほうが入っている
+	// chain_num[i] には chain[i - 1] と chain[i] の共通の候補が入っている
+	ASSERT(chain_size < CELL_CNT);
+	ASSERT(chain_bb.popcnt() == chain_size);
+
+	auto bb = effect_bb(chain[chain_size - 1]) & two & p.cand_bb(n2) & ~p.cand_bb(n1);
+	chain_num[chain_size] = n2;
+
+	while (bb.isnot_empty()) {
+		auto sq = chain[chain_size] = bb.pop();
+		// chain にループがあってはいけない
+		if (chain_bb.at(sq)) continue;
+		auto n3 = NUM_NONE;
+		for (auto n : Number()) {
+			if (n != n2 && p.cand_bb(n).at(sq)) {
+				n3 = n; break;
+			}
+		}
+		if (n3 == chain_num[0]) {
+			if (effect_bb(sq).at(chain[0])) {
+				// 連続な chain が完成している
+				// chain[i], chain[i + 1] に共通するグループの他のマスには，
+				// chain_num[i + 1] を入れることはできない
+				for (int i = 0; i < chain_size + 1; ++i) {
+					int ip = (i + 1) % (chain_size + 1);
+					for (auto grt : GroupType()) {
+						auto g = group_of(grt, chain[i]);
+						if (g == group_of(grt, chain[ip])) {
+							auto grp_bb = group_bb(g) ^ chain[i] ^ chain[ip];
+							if ((p.cand_bb(chain_num[ip]) & grp_bb).isnot_empty()) {
+								// 消す候補が存在する
+								add_sol(p, new sol_xychain(chain, chain_num, chain_size + 1));
+								return true;
+							}
+						}
+					}
+				}
+			}
+			else {
+				auto bb = effect_bb(sq) & effect_bb(chain[0]);
+				while (bb.isnot_empty()) {
+					// 不連続な chain が完成している
+					auto sq = bb.pop();
+					if (p.cand_bb(n3).at(sq)) {
+						add_sol(p, new sol_xychain_disc(chain, chain_num, chain_size + 1));
+						return true;
+					}
+				}
+			}
+		}
+		if (search_sol_xychain_body(p, chain, chain_num, chain_size + 1,
+			chain_bb | chain[chain_size], n2, n3, two))
+			return true;
+	}
+
+	return false;
+}
+
+bool Search::search_sol_xychain(problem& p)
+{
+	// XY-chainを探す
+	Square chain[CELL_CNT];
+	Number chain_num[CELL_CNT];
+
+	// 候補数が2のマス
+	auto two = p.cand_two_bb();
+	auto tar = two;
+
+	while (tar.isnot_empty()) {
+		// 開始地点
+		auto sq = chain[0] = tar.pop();
+		// sqに入る2数を求める
+		Number n1 = NUM_NONE, n2 = NUM_NONE;
+		for (auto n : Number()) {
+			if (p.cand_bb(n).at(sq)) {
+				if (n1 == NUM_NONE) n1 = n;
+				else { n2 = n; break; }
+			}
+		}
+		chain_num[0] = n1;
+		if (search_sol_xychain_body(p, chain, chain_num, 1, sq, n1, n2, two))
+			return true;
+		chain_num[0] = n2;
+		if (search_sol_xychain_body(p, chain, chain_num, 1, sq, n2, n1, two))
+			return true;
+	}
+
+	return false;
+}
+
+void Search::make_problem_pre(const problem& p, const vector<const predicate*>& pre)
+{
+	bool flg_meet = false;
+	do {
+		make_problem(p);
+		if (flg_exit) return;
+		if (pre.size() == 0) break;
+		bool flg_solved = false;
+		flg_meet = true;
+		for (auto pr : pre) {
+			if (pr->need_sol() && !flg_solved) {
+				solve(*ans[0], false);
+				flg_solved = true;
+			}
+			if (!pr->meet(*ans[0], sols)) {
+				flg_meet = false;
+				break;
+			}
+		}
+	} while (!flg_meet);
+	cout << "made " << ans[0]->tostring() << endl;
+}
+
 // pro を元にして問題を作成
 void Search::make_problem(const problem& pro)
 {
@@ -285,19 +392,12 @@ void Search::make_problem(const problem& pro)
 	auto p = pro;
 	bool flg_search = true;
 
-	// 処理時間を計測
-	chrono::system_clock::time_point start, end;
-	double solve_time = 0, ans0_time = 0, ans1_time = 0, ans2_time = 0;
-
 	for (;;)
 	{
 		// 前の解が再利用できないなら解く
 		if (flg_search) {
-			start = chrono::system_clock::now();
 			// p の解を求める
 			solve_all(p, false, true, ANSWER_MAX);
-			end = chrono::system_clock::now();
-			solve_time += (double)(chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0);
 			if (flg_exit) {
 				cout << "stopped" << endl;
 				return;
@@ -305,16 +405,12 @@ void Search::make_problem(const problem& pro)
 		}
 
 		if (ans.size() == 0) {
-			start = chrono::system_clock::now();
 			// どこかの数字を消す
 			auto sq = (~p.empty_bb()).peek_random(mt);
 			p.erase(sq);
 			flg_search = true;
-			end = chrono::system_clock::now();
-			ans0_time += (double)(chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0);
 		}
 		else if (ans.size() == 1) {
-			start = chrono::system_clock::now();
 			// どこかの数字を消しても解が 1つのままなら消す
 			auto flg_finished = true;
 			auto bb = ~p.empty_bb();
@@ -330,12 +426,9 @@ void Search::make_problem(const problem& pro)
 				}
 				p.set(sq, n);
 			} while (bb.isnot_empty());
-			end = chrono::system_clock::now();
-			ans1_time += (double)(chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0);
 			if (flg_finished) break;
 		}
 		else {
-			start = chrono::system_clock::now();
 			// ans のうち，増やすと最も解答数が少なくなる数字を増やす
 
 			// sq に n が入る解答の数
@@ -388,13 +481,10 @@ void Search::make_problem(const problem& pro)
 			}
 
 		LOOPEND:;
-			end = chrono::system_clock::now();
-			ans2_time += (double)(chrono::duration_cast<chrono::microseconds>(end - start).count() / 1000.0);
 		}
 	}
 
 	// 完成
-	cout << "made " << p.tostring() << endl;
-	cout << "info time solve " << (int)solve_time <<
-		" ans0 " << (int)ans0_time << " ans1 " << (int)ans1_time << " ans2 " << (int)ans2_time << endl;
+	clear_ans();
+	ans.push_back(new problem(p));
 }

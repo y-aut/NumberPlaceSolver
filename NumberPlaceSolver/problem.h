@@ -36,6 +36,7 @@ public:
 
 	// 候補数によるフィルター
 	bitboard cand_one_bb() const;
+	bitboard cand_two_bb() const;
 	// 各マスの候補数を計算
 	void get_cand_count_bb(bitboard bb[NUMBER_CNT + 1]) const;
 	// 候補数が 1以上で最小のマスを返す

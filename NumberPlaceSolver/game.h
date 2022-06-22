@@ -174,6 +174,10 @@ inline Group group_of(const Square sq) {
 	return grt == GRT_FILE ? to_group(file_of(sq))
 		: (grt == GRT_RANK ? to_group(rank_of(sq)) : to_group(block_of(sq)));
 }
+inline Group group_of(const GroupType grt, const Square sq) {
+	return grt == GRT_FILE ? to_group(file_of(sq))
+		: (grt == GRT_RANK ? to_group(rank_of(sq)) : to_group(block_of(sq)));
+}
 
 string to_string(const Group g);
 

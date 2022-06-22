@@ -8,11 +8,13 @@
 #include "bitboard.h"
 #include "bitarray32.h"
 #include "search.h"
+#include "predicate.h"
 
 using namespace std;
 
 problem p;
 future<void> best;
+vector<const predicate*> pre;
 
 int USI::loop()
 {
@@ -45,6 +47,7 @@ int USI::loop()
 		if (cmds[0].size() > 2 && cmds[0].substr(0, 2) == ">:")
 			cmds[0] = cmds[0].substr(2, cmds[0].size() - 2);
 		if (cmds[0] == "usi") usi_cmd();
+		else if (cmds[0] == "setoption" || cmds[0] == "set") setoption_cmd(cmds);
 		else if (cmds[0] == "problem" || cmds[0] == "p") problem_cmd(cmds);
 		else if (cmds[0] == "solve" || cmds[0] == "s") solve_cmd(cmds);
 		else if (cmds[0] == "make" || cmds[0] == "m") make_cmd(cmds);
@@ -59,6 +62,40 @@ int USI::loop()
 void USI::usi_cmd()
 {
 	cout << "NumberPlaceSolver_usiok" << endl;
+}
+
+void USI::setoption_cmd(const vector<string> cmds)
+{
+	try
+	{
+		if (cmds.size() < 2) throw exception();
+		if (cmds[1] == "predicate" || cmds[1] == "p") {
+			if (cmds.size() < 3) throw exception();
+			if (cmds[2] == "add" || cmds[2] == "a") {
+				if (cmds.size() < 4) throw exception();
+				if (cmds[3] == "xwing") {
+					pre.push_back(new pre_solution(&typeid(sol_xwing)));
+				}
+				else if (cmds[3] == "xychain") {
+					pre.push_back(new pre_solution(&typeid(sol_xychain)));
+				}
+				else if (cmds[3] == "xychain_disc") {
+					pre.push_back(new pre_solution(&typeid(sol_xychain_disc)));
+				}
+				else throw exception();
+			}
+			else if (cmds[2] == "clear" || cmds[2] == "c") {
+				for (auto p : pre) delete p;
+				pre.clear();
+			}
+			else throw exception();
+		}
+		else throw exception();
+	}
+	catch (const std::exception&)
+	{
+		cout << "info string illegal expression." << endl;
+	}
 }
 
 void USI::problem_cmd(const vector<string> cmds)
@@ -84,7 +121,7 @@ void USI::solve_cmd(const vector<string> cmds)
 
 void USI::make_cmd(const vector<string> cmds)
 {
-	best = async(launch::async, [] { return Search::make_problem(p); });
+	best = async(launch::async, [] { return Search::make_problem_pre(p, pre); });
 }
 
 void USI::stop_cmd()

@@ -84,3 +84,42 @@ public:
 	string tostring() const override;
 	void apply(problem& p) const override;
 };
+
+class sol_xychain : public solution
+{
+	// chain_num[i] には chain[i - 1] と chain[i] に共通する候補が入っている
+	// chain[i], chain[i + 1] に共通するグループの他のマスには，
+	// chain_num[i + 1] を入れることはできない
+	// chain の最後のマスは chain[0] と同じグループにある
+	vector<Square> chain;
+	vector<Number> chain_num;
+
+public:
+	sol_xychain(const Square c[], const Number c_num[], const int c_size) {
+		for (int i = 0; i < c_size; ++i) {
+			chain.push_back(c[i]);
+			chain_num.push_back(c_num[i]);
+		}
+	}
+	string tostring() const override;
+	void apply(problem& p) const override;
+};
+
+class sol_xychain_disc : public solution
+{
+	// chain_num[i] には chain[i - 1] と chain[i] に共通する候補が入っている
+	// chain[0] と chain.last の共通する領域には、chain_num[0] を入れることはできない
+	// chain の最後のマスは chain[0] と同じグループにある
+	vector<Square> chain;
+	vector<Number> chain_num;
+
+public:
+	sol_xychain_disc(const Square c[], const Number c_num[], const int c_size) {
+		for (int i = 0; i < c_size; ++i) {
+			chain.push_back(c[i]);
+			chain_num.push_back(c_num[i]);
+		}
+	}
+	string tostring() const override;
+	void apply(problem& p) const override;
+};

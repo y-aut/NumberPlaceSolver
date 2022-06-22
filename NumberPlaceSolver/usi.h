@@ -14,6 +14,7 @@ namespace USI
 
 	// ƒRƒ}ƒ“ƒhˆ—
 	void usi_cmd();
+	void setoption_cmd(const vector<string>);
 	void problem_cmd(const vector<string>);
 	void solve_cmd(const vector<string>);
 	void make_cmd(const vector<string>);

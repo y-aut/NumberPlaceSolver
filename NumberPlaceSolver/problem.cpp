@@ -81,6 +81,21 @@ bitboard problem::cand_one_bb() const
 	return one;
 }
 
+bitboard problem::cand_two_bb() const
+{
+	bitboard one = cand_bb(NUM_ZERO);
+	bitboard two = zero_bb();
+	bitboard more = zero_bb();
+
+	for (Number n = NUM_ZERO + 1; n < NUM_NB; ++n) {
+		more |= two & cand_bb(n);
+		two = (two & ~more) | (one & cand_bb(n));
+		one = (one | cand_bb(n)) & ~(two | more);
+	}
+
+	return two;
+}
+
 void problem::get_cand_count_bb(bitboard bb[NUMBER_CNT + 1]) const
 {
 	bb[0] = all_bb();

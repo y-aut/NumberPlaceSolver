@@ -50,3 +50,40 @@ void sol_xwing::apply(problem& p) const
     do mask |= group_bb((Group)g1_.pop()); while (g1_.isnot_empty());
     *p.cand_bb_ptr(num) &= mask;
 }
+
+string sol_xychain::tostring() const
+{
+    string str = "xychain " + to_string(chain.size()) + " ";
+    for (auto sq : chain) str += to_string(sq) + " ";
+    str += "num " + to_string(chain_num.size()) + " ";
+    for (auto n : chain_num) str += to_string(n) + " ";
+    return str;
+}
+
+void sol_xychain::apply(problem& p) const
+{
+    for (int i = 0; i < chain.size(); ++i) {
+        int ip = (i + 1) % chain.size();
+        for (auto grt : GroupType()) {
+            auto g = group_of(grt, chain[i]);
+            if (g == group_of(grt, chain[ip])) {
+                auto grp_bb = group_bb(g) ^ chain[i] ^ chain[ip];
+                *p.cand_bb_ptr(chain_num[ip]) &= ~grp_bb;
+            }
+        }
+    }
+}
+
+string sol_xychain_disc::tostring() const
+{
+    string str = "xychain_disc " + to_string(chain.size()) + " ";
+    for (auto sq : chain) str += to_string(sq) + " ";
+    str += "num " + to_string(chain_num.size()) + " ";
+    for (auto n : chain_num) str += to_string(n) + " ";
+    return str;
+}
+
+void sol_xychain_disc::apply(problem& p) const
+{
+    *p.cand_bb_ptr(chain_num[0]) &= ~(effect_bb(chain[0]) & effect_bb(chain[chain.size() - 1]));
+}
