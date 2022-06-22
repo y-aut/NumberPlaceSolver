@@ -428,11 +428,11 @@ void get_link(const problem& p, vector<bitboard> strong[NUM_NB], vector<bitboard
 		for (auto g : Group()) {
 			auto bb = p.cand_bb(n) & group_bb(g);
 			auto cnt = bb.popcnt();
-			if (cnt == 2) {
-				strong[n].push_back(bb);
-			}
-			else if (cnt > 2) {
+			if (cnt >= 2) {
 				weak[n].push_back(bb);
+				if (cnt == 2) {
+					strong[n].push_back(bb);
+				}
 			}
 		}
 	}
