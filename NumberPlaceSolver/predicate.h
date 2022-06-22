@@ -13,7 +13,36 @@ public:
 	virtual bool need_sol() const { return false; }
 
 	// §–ñ‚ğ–‚½‚µ‚Ä‚¢‚é‚©
-	virtual bool meet(const problem& p, const vector<const solution*>& sol) const = 0;
+	virtual bool meet(const problem& p, const bool solved, const vector<const solution*>& sol) const = 0;
+};
+
+// ‹t
+class pre_reverse : public predicate
+{
+private:
+	const predicate* pre;
+
+public:
+	pre_reverse(const predicate* p) : pre(p) {}
+
+	bool need_sol() const override { return pre->need_sol(); }
+
+	bool meet(const problem& p, const bool solved, const vector<const solution*>& sol) const override {
+		return !pre->meet(p, solved, sol);
+	}
+};
+
+// ‰ğ‚¯‚é
+class pre_solvable : public predicate
+{
+public:
+	pre_solvable() {}
+
+	bool need_sol() const override { return true; }
+
+	bool meet(const problem& p, const bool solved, const vector<const solution*>& sol) const override {
+		return solved;
+	}
 };
 
 // “Á’è‚Ì‰ğ–@‚ğ—p‚¢‚é
@@ -27,7 +56,7 @@ public:
 
 	bool need_sol() const override { return true; }
 
-	bool meet(const problem& p, const vector<const solution*>& sol) const override {
+	bool meet(const problem& p, const bool solved, const vector<const solution*>& sol) const override {
 		for (auto s : sol)
 			if (typeid(*s) == *ty) return true;
 		return false;

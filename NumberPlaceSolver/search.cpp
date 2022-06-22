@@ -13,16 +13,11 @@ vector<const problem*> ans;
 std::random_device rnd;
 std::mt19937 mt(rnd());
 
-void Search::clear_sols()
+template <typename T>
+void clear_vector(vector<T*>& vec)
 {
-	for (auto ptr : sols) delete ptr;
-	sols.clear();
-}
-
-void Search::clear_ans()
-{
-	for (auto ptr : ans) delete ptr;
-	ans.clear();
+	for (auto ptr : vec) delete ptr;
+	vec.clear();
 }
 
 void solve_all_body(problem& p, const bool random, const int max)
@@ -63,7 +58,7 @@ void Search::solve_all(const problem& p, const bool output, const bool random, c
 	flg_exit = false;
 	flg_maxans = false;
 	flg_output = output;
-	clear_ans();
+	clear_vector(ans);
 	auto cpy = p;
 	solve_all_body(cpy, random, max);
 	if (flg_output) {
@@ -76,41 +71,6 @@ void Search::solve_all(const problem& p, const bool output, const bool random, c
 	}
 }
 
-void Search::solve(const problem& pro, const bool output)
-{
-	flg_exit = false;
-	flg_output = output;
-	clear_sols();
-	auto p = pro;
-
-	while (p.empty_bb().isnot_empty())
-	{
-		if (flg_exit) {
-			cout << "stopped" << endl;
-			return;
-		}
-
-		if (search_sol_alone_num(p)) continue;
-		if (search_sol_alone_num_in_group(p)) continue;
-		if (search_sol_occupy(p)) continue;
-		if (search_sol_reserve(p)) continue;
-		if (search_sol_xwing(p)) continue;
-		if (search_sol_xychain(p)) continue;
-
-		// no solution
-		if (flg_output) {
-			cout << "giveup" << endl;
-			cout << "info board " << p.tostring() << endl;
-		}
-		return;
-	}
-
-	if (flg_output) {
-		cout << "solved" << endl;
-		cout << "info board " << p.tostring() << endl;
-	}
-}
-
 void Search::add_sol(problem& p, solution* sol)
 {
 	sol->apply(p);
@@ -119,7 +79,7 @@ void Search::add_sol(problem& p, solution* sol)
 	sols.push_back(sol);
 }
 
-bool Search::search_sol_alone_num(problem& p)
+bool search_sol_alone_num(problem& p)
 {
 	auto one = p.cand_one_bb();
 	if (one.isnot_empty()) {
@@ -131,7 +91,7 @@ bool Search::search_sol_alone_num(problem& p)
 	return false;
 }
 
-bool Search::search_sol_alone_num_in_group(problem& p)
+bool search_sol_alone_num_in_group(problem& p)
 {
 	for (auto g : Group()) {
 		for (auto n : Number()) {
@@ -178,7 +138,7 @@ bool search_sol_occupy_body(problem& p, const int depth, const int depth_max, co
 	return false;
 }
 
-bool Search::search_sol_occupy(problem& p)
+bool search_sol_occupy(problem& p)
 {
 	Number num[NUMBER_CNT];
 
@@ -191,7 +151,7 @@ bool Search::search_sol_occupy(problem& p)
 	return false;
 }
 
-bool Search::search_sol_reserve(problem& p)
+bool search_sol_reserve(problem& p)
 {
 	for (auto g1 : Group()) {
 		for (auto g2 : Group()) {
@@ -250,7 +210,7 @@ bool search_sol_xwing_body(problem& p, const int depth, const int depth_max, con
 	return false;
 }
 
-bool Search::search_sol_xwing(problem& p)
+bool search_sol_xwing(problem& p)
 {
 	Group g1[CELLS_IN_GROUP];
 
@@ -327,7 +287,7 @@ bool search_sol_xychain_body(problem& p, Square chain[], Number chain_num[], con
 	return false;
 }
 
-bool Search::search_sol_xychain(problem& p)
+bool search_sol_xychain(problem& p)
 {
 	// XY-chainを探す
 	Square chain[CELL_CNT];
@@ -359,6 +319,125 @@ bool Search::search_sol_xychain(problem& p)
 	return false;
 }
 
+bool search_sol_simple_chain_body(problem& p, const Number n, Square chain[], const int chain_size,
+	const bitboard chain_bb, const vector<bitboard>& strong, const vector<bitboard>& weak)
+{
+	// chain_size が4以上の偶数で，chain[0] と chain[last] の共通領域に n が入りうるマスが含まれていたら終了
+	if ((chain_size & 1) == 0 && chain_size >= 4 &&
+		(outer_effect_bb(chain[0]) & outer_effect_bb(chain[chain_size - 1]) & p.cand_bb(n)).isnot_empty()) {
+		add_sol(p, new sol_simple_chain(n, chain, chain_size));
+		return true;
+	}
+
+	// 次に探すのは，
+	// chain_size が奇数: 強リンク，偶数: 弱リンク
+	auto links = chain_size & 1 ? strong : weak;
+	for (auto bb : links) {
+		// 最後のマスを含み，これまでに登場していないマス
+		if ((bb & chain[chain_size - 1]).isnot_empty() && (chain_bb & bb) != bb) {
+			bb ^= chain[chain_size - 1];
+			do
+			{
+				chain[chain_size] = bb.pop();
+				if (search_sol_simple_chain_body(p, n, chain, chain_size + 1, chain_bb | chain[chain_size], strong, weak))
+					return true;
+			} while (bb.isnot_empty());
+		}
+	}
+
+	return false;
+}
+
+bool search_sol_simple_chain(problem& p, const vector<bitboard> strong[NUM_NB], const vector<bitboard> weak[NUM_NB])
+{
+	Square chain[CELL_CNT];
+
+	// 強リンク，弱リンク，... ，強リンク の列を探す
+	for (auto n : Number()) {
+		for (auto sq : Square()) {
+			chain[0] = sq;
+			if (search_sol_simple_chain_body(p, n, chain, 1, sq, strong[n], weak[n]))
+				return true;
+		}
+	}
+
+	return false;
+}
+
+bool search_sol_hamada_body(problem& p, const Number n, Square chain[], const int chain_size,
+	const bitboard chain_bb, const vector<bitboard>& strong, const vector<bitboard>& weak)
+{
+	// chain_size が3以上の奇数で，chain[2k] の和領域を n の候補から除外したときに
+	// n が入らなくなる group が見つかれば終了
+	if ((chain_size & 1) && chain_size >= 3) {
+		auto bb = p.cand_bb(n);
+		for (int i = 0; i < chain_size; i += 2) bb &= rev_effect_bb(chain[i]);
+		for (int i = 0; i < chain_size; i += 2) bb |= chain[i];
+		for (auto g : Group()) {
+			if (((p.num_bb(n) | bb) & group_bb(g)).is_empty()) {
+				add_sol(p, new sol_hamada(n, g, chain, chain_size));
+				return true;
+			}
+		}
+	}
+
+	// 次に探すのは，
+	// chain_size が奇数: 弱リンク，偶数: 強リンク
+	auto links = chain_size & 1 ? weak : strong;
+	for (auto bb : links) {
+		// 最後のマスを含み，これまでに登場していないマス
+		if ((bb & chain[chain_size - 1]).isnot_empty() && (chain_bb & bb) != bb) {
+			bb ^= chain[chain_size - 1];
+			do
+			{
+				chain[chain_size] = bb.pop();
+				if (search_sol_hamada_body(p, n, chain, chain_size + 1, chain_bb | chain[chain_size], strong, weak))
+					return true;
+			} while (bb.isnot_empty());
+		}
+	}
+
+	return false;
+}
+
+bool search_sol_hamada(problem& p, const vector<bitboard> strong[NUM_NB], const vector<bitboard> weak[NUM_NB])
+{
+	Square chain[CELL_CNT];
+
+	// 弱リンク，強リンク，... ，強リンク の列を探す
+	for (auto n : Number()) {
+		for (auto sq : Square()) {
+			chain[0] = sq;
+			if (search_sol_hamada_body(p, n, chain, 1, sq, strong[n], weak[n]))
+				return true;
+		}
+	}
+
+	return false;
+}
+
+void get_link(const problem& p, vector<bitboard> strong[NUM_NB], vector<bitboard> weak[NUM_NB])
+{
+	for (auto n : Number()) {
+		strong[n].clear();
+		weak[n].clear();
+	}
+
+	// リンクを見つける
+	for (auto n : Number()) {
+		for (auto g : Group()) {
+			auto bb = p.cand_bb(n) & group_bb(g);
+			auto cnt = bb.popcnt();
+			if (cnt == 2) {
+				strong[n].push_back(bb);
+			}
+			else if (cnt > 2) {
+				weak[n].push_back(bb);
+			}
+		}
+	}
+}
+
 void Search::make_problem_pre(const problem& p, const vector<const predicate*>& pre)
 {
 	bool flg_meet = false;
@@ -366,14 +445,15 @@ void Search::make_problem_pre(const problem& p, const vector<const predicate*>& 
 		make_problem(p);
 		if (flg_exit) return;
 		if (pre.size() == 0) break;
+		bool flg_sol = false;
 		bool flg_solved = false;
 		flg_meet = true;
 		for (auto pr : pre) {
-			if (pr->need_sol() && !flg_solved) {
-				solve(*ans[0], false);
-				flg_solved = true;
+			if (pr->need_sol() && !flg_sol) {
+				flg_solved = solve(*ans[0], false);
+				flg_sol = true;
 			}
-			if (!pr->meet(*ans[0], sols)) {
+			if (!pr->meet(*ans[0], flg_solved, sols)) {
 				flg_meet = false;
 				break;
 			}
@@ -485,6 +565,49 @@ void Search::make_problem(const problem& pro)
 	}
 
 	// 完成
-	clear_ans();
+	clear_vector(ans);
 	ans.push_back(new problem(p));
+}
+
+bool Search::solve(const problem& pro, const bool output)
+{
+	flg_exit = false;
+	flg_output = output;
+	clear_vector(sols);
+	auto p = pro;
+
+	vector<bitboard> strong[NUM_NB], weak[NUM_NB];
+	while (p.empty_bb().isnot_empty())
+	{
+		if (flg_exit) {
+			cout << "stopped" << endl;
+			return false;
+		}
+
+		if (search_sol_alone_num(p)) continue;
+		if (search_sol_alone_num_in_group(p)) continue;
+		if (search_sol_occupy(p)) continue;
+		if (search_sol_reserve(p)) continue;
+		if (search_sol_xwing(p)) continue;
+		if (search_sol_xychain(p)) continue;
+
+		get_link(p, strong, weak);
+		if (search_sol_simple_chain(p, strong, weak)) continue;
+		if (search_sol_hamada(p, strong, weak)) continue;
+
+		// no solution
+		if (flg_output) {
+			cout << "giveup" << endl;
+			cout << "info board " << p.tostring() << endl;
+		}
+
+		return false;
+	}
+
+	if (flg_output) {
+		cout << "solved" << endl;
+		cout << "info board " << p.tostring() << endl;
+	}
+
+	return true;
 }

@@ -123,3 +123,39 @@ public:
 	string tostring() const override;
 	void apply(problem& p) const override;
 };
+
+class sol_simple_chain : public solution
+{
+	// chain.size() は偶数
+	// 強リンク，弱リンク，... ，強リンク
+	// chain[0] と chain.last の共通領域には，num を入れることはできない
+	Number num;
+	vector<Square> chain;
+
+public:
+	sol_simple_chain(const Number n, const Square c[], const int c_size) : num(n) {
+		for (int i = 0; i < c_size; ++i)
+			chain.push_back(c[i]);
+	}
+	string tostring() const override;
+	void apply(problem& p) const override;
+};
+
+class sol_hamada : public solution
+{
+	// chain.size() は奇数
+	// 弱リンク，強リンク，... ，強リンク
+	// chain[0] には，num を入れることはできない
+	// なぜなら，grp 内で num を入れられる場所がなくなるから
+	Number num;
+	Group grp;
+	vector<Square> chain;
+
+public:
+	sol_hamada(const Number n, const Group g, const Square c[], const int c_size) : num(n), grp(g) {
+		for (int i = 0; i < c_size; ++i)
+			chain.push_back(c[i]);
+	}
+	string tostring() const override;
+	void apply(problem& p) const override;
+};

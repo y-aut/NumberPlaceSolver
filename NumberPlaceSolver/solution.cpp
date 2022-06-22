@@ -85,5 +85,31 @@ string sol_xychain_disc::tostring() const
 
 void sol_xychain_disc::apply(problem& p) const
 {
-    *p.cand_bb_ptr(chain_num[0]) &= ~(effect_bb(chain[0]) & effect_bb(chain[chain.size() - 1]));
+    *p.cand_bb_ptr(chain_num[0]) &= rev_effect_bb(chain[0]) | rev_effect_bb(chain[chain.size() - 1]);
+}
+
+string sol_simple_chain::tostring() const
+{
+    string str = "simple_chain " + to_string(chain.size()) + " ";
+    for (auto sq : chain) str += to_string(sq) + " ";
+    str += "num " + to_string(num);
+    return str;
+}
+
+void sol_simple_chain::apply(problem& p) const
+{
+    *p.cand_bb_ptr(num) &= rev_outer_effect_bb(chain[0]) | rev_outer_effect_bb(chain[chain.size() - 1]);
+}
+
+string sol_hamada::tostring() const
+{
+    string str = "hamada " + to_string(chain.size()) + " ";
+    for (auto sq : chain) str += to_string(sq) + " ";
+    str += "num " + to_string(num) + " group " + to_string(grp);
+    return str;
+}
+
+void sol_hamada::apply(problem& p) const
+{
+    *p.cand_bb_ptr(num) &= ~sq_bb(chain[0]);
 }

@@ -64,6 +64,32 @@ void USI::usi_cmd()
 	cout << "NumberPlaceSolver_usiok" << endl;
 }
 
+predicate* to_predicate(const string str)
+{
+	if (str.size() > 1 && str[0] == '!') {
+		return new pre_reverse(to_predicate(str.substr(1, str.size() - 1)));
+	}
+	else if (str == "solvable") {
+		return new pre_solvable();
+	}
+	else if (str == "xwing") {
+		return new pre_solution(&typeid(sol_xwing));
+	}
+	else if (str == "xychain") {
+		return new pre_solution(&typeid(sol_xychain));
+	}
+	else if (str == "xychain_disc") {
+		return new pre_solution(&typeid(sol_xychain_disc));
+	}
+	else if (str == "simple_chain") {
+		return new pre_solution(&typeid(sol_simple_chain));
+	}
+	else if (str == "hamada") {
+		return new pre_solution(&typeid(sol_hamada));
+	}
+	else throw exception();
+}
+
 void USI::setoption_cmd(const vector<string> cmds)
 {
 	try
@@ -73,16 +99,7 @@ void USI::setoption_cmd(const vector<string> cmds)
 			if (cmds.size() < 3) throw exception();
 			if (cmds[2] == "add" || cmds[2] == "a") {
 				if (cmds.size() < 4) throw exception();
-				if (cmds[3] == "xwing") {
-					pre.push_back(new pre_solution(&typeid(sol_xwing)));
-				}
-				else if (cmds[3] == "xychain") {
-					pre.push_back(new pre_solution(&typeid(sol_xychain)));
-				}
-				else if (cmds[3] == "xychain_disc") {
-					pre.push_back(new pre_solution(&typeid(sol_xychain_disc)));
-				}
-				else throw exception();
+				pre.push_back(to_predicate(cmds[3]));
 			}
 			else if (cmds[2] == "clear" || cmds[2] == "c") {
 				for (auto p : pre) delete p;
@@ -114,14 +131,14 @@ void USI::solve_cmd(const vector<string> cmds)
 {
 	auto cpy = p;
 	if (cmds.size() >= 2 && cmds[1] == "all")
-		best = async(launch::async, [] { return Search::solve_all(p, true); });
+		best = async(launch::async, [] { Search::solve_all(p, true); });
 	else
-		best = async(launch::async, [] { return Search::solve(p, true); });
+		best = async(launch::async, [] { Search::solve(p, true); });
 }
 
 void USI::make_cmd(const vector<string> cmds)
 {
-	best = async(launch::async, [] { return Search::make_problem_pre(p, pre); });
+	best = async(launch::async, [] { Search::make_problem_pre(p, pre); });
 }
 
 void USI::stop_cmd()

@@ -115,3 +115,5 @@ inline bitboard rank_bb(const Rank r) { ASSERTR(is_ok(r), zero_bb()); return gro
 inline bitboard block_bb(const Block b) { ASSERTR(is_ok(b), zero_bb()); return group_bb(to_group(b)); }
 inline bitboard effect_bb(const Square sq) { ASSERTR(is_ok(sq), zero_bb()); return EFFECT_BB[sq]; }
 inline bitboard rev_effect_bb(const Square sq) { ASSERTR(is_ok(sq), zero_bb()); return REV_EFFECT_BB[sq]; }
+inline bitboard outer_effect_bb(const Square sq) { return effect_bb(sq) ^ sq; }
+inline bitboard rev_outer_effect_bb(const Square sq) { return rev_effect_bb(sq) ^ sq; }
